@@ -6,6 +6,7 @@
   const DATA_KEY='wealthflow_data_v1', CONFIG_KEY='wealthflow_cloud_v1', AUTH_KEY='wealthflow_auth_v1', QUEUE_KEY='wealthflow_queue_v1';
   const DATA_PREFIX='wealthflow_private_data_v5_', QUEUE_PREFIX='wealthflow_private_queue_v5_';
   const MIGRATION_BACKUP='wealthflow_unclaimed_legacy_backup_v5';
+  const AUTH_PERSIST='wealthflow_remember_auth_v51', LOGOUT_EVENT='wealthflow_security_logout_v51';
   const publicConfig=(window.WEALTHFLOW_CLOUD||{});
   const sharedConfigured=/^https:\/\/[a-z0-9.-]+\.supabase\.co$/i.test(String(publicConfig.url||''))&&/^(sb_publishable_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9_.-]+)$/.test(String(publicConfig.key||''));
   let booting=false, authMessage='', accountEpoch=0;
@@ -55,6 +56,7 @@
   const money=n=>new Intl.NumberFormat('en-MY',{style:'currency',currency:CURRENCY,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n)||0).replace('MYR','RM');
   const shortMoney=n=> Math.abs(n)>=1000?'RM '+(Number(n)/1000).toFixed(1)+'k':money(n);
   const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}};
+  const readSession=(key,fallback)=>{try{return JSON.parse(sessionStorage.getItem(key))??fallback}catch{return fallback}};
   const blank=()=>({accounts:[],transactions:[],investments:[],debts:[],goals:[],settings:{id:uid(),monthlyBudget:2500}});
   const cleanData=raw=>{
     let val=blank();
@@ -65,10 +67,25 @@
   };
   // V5 isolates browser caches by Supabase user ID. Never merge legacy browser data into a new signup.
   const previousConfig=read(CONFIG_KEY,{});
-  let auth=read(AUTH_KEY,null);
+  // Auth tokens are tab-session-only by default. Existing V5 credentials are migrated
+  // out of persistent localStorage on first V5.1 launch without losing this session.
+  let rememberSession=localStorage.getItem(AUTH_PERSIST)==='true';
+  const previousAuth=read(AUTH_KEY,null);
+  let auth=readSession(AUTH_KEY,null)||previousAuth;
+  if(previousAuth&&!rememberSession){
+    try{sessionStorage.setItem(AUTH_KEY,JSON.stringify(previousAuth));}catch{}
+    localStorage.removeItem(AUTH_KEY);
+  }
+  const clearAuthStorage=()=>{localStorage.removeItem(AUTH_KEY);localStorage.removeItem(AUTH_PERSIST);sessionStorage.removeItem(AUTH_KEY);};
+  const writeAuthStorage=()=>{
+    if(!auth){clearAuthStorage();return;}
+    sessionStorage.setItem(AUTH_KEY,JSON.stringify(auth));
+    if(rememberSession){localStorage.setItem(AUTH_PERSIST,'true');localStorage.setItem(AUTH_KEY,JSON.stringify(auth));}
+    else{localStorage.removeItem(AUTH_PERSIST);localStorage.removeItem(AUTH_KEY);}
+  };
   let config=sharedConfigured?{url:publicConfig.url,key:publicConfig.key}:{url:'',key:'',...previousConfig};
   const mismatchedProject=sharedConfigured&&previousConfig.url&&previousConfig.url.replace(/\/+$/,'')!==String(publicConfig.url).replace(/\/+$/,'');
-  if(mismatchedProject){auth=null;localStorage.removeItem(AUTH_KEY);}
+  if(mismatchedProject){auth=null;clearAuthStorage();}
   const userStorageKey=id=>DATA_PREFIX+id;
   const userQueueKey=id=>QUEUE_PREFIX+id;
   const userId=()=>auth?.user?.id||null;
@@ -183,7 +200,7 @@
   function renderGateway(){
     const siteSetup=!cloudReady();
     return `<div class="auth-layout"><main class="auth-card" aria-label="WealthFlow account access">
-      <div class="auth-brand"><span class="auth-logo">↗</span><strong>WealthFlow</strong><span class="auth-version">V5 · Personal Accounts</span></div>
+      <div class="auth-brand"><span class="auth-logo">↗</span><strong>WealthFlow</strong><span class="auth-version">V5.1 · Privacy Update</span></div>
       <div class="auth-eyebrow">YOUR OWN PRIVATE MONEY SPACE</div>
       <h1>${siteSetup?'Set up your website':'Welcome to WealthFlow'}</h1>
       <p class="auth-intro">${siteSetup?'The site owner needs to add a Supabase project URL and public publishable key to <code>cloud-config.js</code>, then redeploy this folder. No private bank details are required.':'Track your spending, accounts, savings, investments and bills. Each person starts with an empty workspace, separate from everyone else.'}</p>
@@ -192,11 +209,12 @@
       <form id="auth-form" class="auth-form"><input type="hidden" name="mode" value="login">
         <div class="form-row"><label class="form-label" for="auth-email">Your email</label><input class="form-input" id="auth-email" name="email" type="email" autocomplete="username" placeholder="you@example.com" required></div>
         <div class="form-row"><label class="form-label" for="auth-password">Password</label><input class="form-input" id="auth-password" name="password" type="password" autocomplete="current-password" minlength="6" required></div>
+        <label class="auth-remember"><input type="checkbox" name="remember" value="on" ${rememberSession?'checked':''}> Stay signed in on this device <small>(do not use on shared computers)</small></label>
         <button class="btn btn-primary auth-submit" id="auth-submit" type="submit">Sign in</button>
       </form>
       <div class="auth-help"><button class="text-button" data-action="forgot-password" type="button">Forgot password?</button></div>
       ${authMessage?`<p class="auth-message" role="status">${esc(authMessage)}</p>`:''}
-      <div class="auth-privacy">${icon('shield','small-ico')} Your financial records are private to your signed-in account. Passwords are handled by Supabase.</div>`}
+      <div class="auth-privacy">${icon('shield','small-ico')} Your financial records are private to your signed-in account. Passwords are handled by Supabase. The owner of this Supabase database can technically access stored records.</div>`}
     </main><aside class="auth-aside"><div class="auth-aside-inner"><span class="auth-aside-tag">Your money · Your rules</span><h2>One link.<br>Separate accounts.</h2><p>Friends can create their own account without seeing yours or configuring a database.</p><div class="auth-benefits"><span>✓ Start empty</span><span>✓ Sync across devices</span><span>✓ Log spending in RM</span><span>✓ Keep investments & bills organized</span></div></div></aside></div>`;
   }
   function render(){const app=document.getElementById('app');if(!app)return;
@@ -260,7 +278,7 @@
   function renderInvestments(){const list=[...data.investments].sort((a,b)=>(a.maturityDate||'').localeCompare(b.maturityDate||'')),active=list.filter(i=>i.status!=='matured'),principal=active.reduce((s,i)=>s+Number(i.principal),0),yieldAmount=active.reduce((s,i)=>s+investmentYield(i),0);const upcoming=active.filter(i=>i.maturityDate>=today()).slice(0,1)[0];return `${heading('GROW YOUR MONEY','Investment Tracker','Record each placement, its duration, maturity date and expected return.',button(icon('plus')+' Add investment','new-investment','btn-primary'))}${banner()}<div class="grid-4">${metric('chart','purple','Tracked Principal',money(principal),'Active investment records')}${metric('trending-up','green','Est. Simple Return',money(yieldAmount),'Illustrative, not guaranteed')}${metric('calendar','gold','Active Investments',String(active.length),'Individual placements')}${metric('target','red','Next Maturity',upcoming?prettyDay(upcoming.maturityDate):'—','Based on entered maturity dates')}</div><h2 class="section-heading">Your placements</h2>${list.length?`<div class="feature-grid">${list.map(i=>{const days=diffDays(i.maturityDate,today()),done=i.status==='matured',matured=!done&&days<0;return `<div class="investment-card"><div class="card-top"><div><h3>${esc(i.name)}</h3><p>${esc(accName(i.accountId))} · ${esc(i.category||'Other')}</p></div><span class="mini-status ${done?'neutral':matured?'warning':''}">${done?'Closed':matured?'Maturity reached':'Active'}</span></div><div class="card-amount">${money(i.principal)}</div><div class="card-pair"><span>Estimated simple return</span><strong class="positive">+ ${money(investmentYield(i))}</strong></div><div class="card-pair"><span>Annual rate (entered)</span><strong>${Number(i.rate)||0}%</strong></div><div class="card-pair"><span>Start</span><strong>${prettyDay(i.startDate)}</strong></div><div class="card-pair"><span>Maturity</span><strong>${prettyDay(i.maturityDate)}</strong></div><div class="card-footer"><span>${done?'Marked as completed':matured?'Maturity date has passed':days+' days to maturity'}</span><div class="actions">${!done?`<button class="btn btn-sm btn-ghost" data-action="mature-investment" data-id="${i.id}">Mark closed</button>`:''}<button class="btn btn-icon" data-action="edit-investment" data-id="${i.id}" aria-label="Edit">${icon('edit','small-ico')}</button><button class="btn btn-icon" data-action="delete-investment" data-id="${i.id}" aria-label="Delete">${icon('trash','small-ico')}</button></div></div></div>`}).join('')}</div>`:empty('🌱','No investments yet','Track fixed deposits, ASNB, or any placement with its own 6-month, 12-month or custom end date.','Add investment','new-investment')}<div class="banner gold" style="margin-top:21px">${icon('info')}<span><strong>Counting wealth correctly:</strong> Investment holdings are already reflected in the selected investment account's balance. Creating a placement can transfer money from a funding account. Maturity and returns are not automatically deposited; record the real cash movement when it happens.</span></div>`;}
   function renderDebts(){const list=[...data.debts].sort((a,b)=>nextDue(a).day.localeCompare(nextDue(b).day)),open=list.filter(d=>owed(d)>0),paid=list.reduce((s,d)=>s+paidForDebt(d),0),owedTotal=totalDebt(),dueSoon=open.filter(d=>diffDays(nextDue(d).day,today())<=7).length;return `${heading('STAY ON TOP OF BILLS','Pay Later & Installments','Keep Shopee SPayLater and other buy-now-pay-later balances visible.',button(icon('plus')+' Add pay later','new-debt','btn-primary'))}${banner()}<div class="grid-4">${metric('credit-card','red','Remaining to Pay',money(owedTotal),'Included as liability')}${metric('check','green','Payments Tracked',money(paid),'Includes previously paid amounts')}${metric('calendar','gold','Due Within 7 Days',String(dueSoon),'Includes overdue plans')}${metric('target','purple','Active Plans',String(open.length),'Installments outstanding')}</div><h2 class="section-heading">Payment plans</h2>${list.length?`<div class="feature-grid">${list.map(d=>{const remain=owed(d),n=nextDue(d),p=d.total>0?100*paidForDebt(d)/d.total:100,late=n.day<today()&&remain>0;return `<div class="debt-card"><div class="card-top"><div><h3>${esc(d.merchant)}</h3><p>${esc(d.description||'Purchase or balance')}</p></div><span class="mini-status ${!remain?'neutral':late?'danger':'warning'}">${!remain?'Paid off':late?'Past due':'Active'}</span></div><div class="card-amount">${money(remain)}</div><div class="card-pair"><span>Remaining of ${money(d.total)}</span><strong>${Math.round(Math.min(100,p))}% paid</strong></div><div class="progress ${p<100?'':'green'}"><span style="width:${Math.min(100,p)}%"></span></div><div class="card-pair" style="margin-top:17px"><span>Installments</span><strong>${Number(d.installments)} months</strong></div><div class="card-pair"><span>${remain?'Next estimated due':'Status'}</span><strong>${remain?prettyDay(n.day):'Complete'}</strong></div><div class="card-footer"><div class="actions">${remain?`<button class="btn btn-sm btn-primary" data-action="pay-debt" data-id="${d.id}">Record payment</button>`:''}<button class="btn btn-icon" data-action="edit-debt" data-id="${d.id}" aria-label="Edit">${icon('edit','small-ico')}</button><button class="btn btn-icon" data-action="delete-debt" data-id="${d.id}" aria-label="Delete">${icon('trash','small-ico')}</button></div></div></div>`}).join('')}</div>`:empty('🛍️','Nothing to pay later','Add an installment plan and see your outstanding liability and next due date.','Add pay later','new-debt')}<div class="banner gold" style="margin-top:21px">${icon('info')}<span><strong>Cash-basis tracking:</strong> Adding a pay-later purchase increases your outstanding debt, but does not withdraw cash. Each repayment records an actual expense and reduces your liability. Due dates are estimated from your payment schedule; check your provider's statement for the official due date.</span></div>`;}
   function renderGoals(){const list=data.goals,active=list.length,reached=list.filter(g=>goalCurrent(g)>=g.target).length,goalTotal=list.reduce((s,g)=>s+Number(g.target),0),savedTotal=list.reduce((s,g)=>s+Math.max(0,goalCurrent(g)),0);return `${heading('FUTURE YOU, FUNDED','Savings Goals','Turn plans into progress — holidays, emergency funds, and more.',button(icon('plus')+' New savings goal','new-goal','btn-primary'))}${banner()}<div class="grid-4">${metric('target','purple','Savings Goals',String(active),'Personal milestones')}${metric('wallet','green','Tracked Progress',money(savedTotal),'Across all savings goals')}${metric('chart','gold','Total Targets',money(goalTotal),'Your combined goals')}${metric('check','green','Goals Reached',String(reached),'Targets met')}</div><h2 class="section-heading">Your goals</h2>${list.length?`<div class="feature-grid">${list.map(g=>{const amount=goalCurrent(g),p=Math.max(0,Math.min(100,amount/g.target*100));return `<div class="goal-card"><div class="card-top"><div><h3>${esc(g.emoji||'🎯')} ${esc(g.name)}</h3><p>${g.accountId?'Linked to '+esc(accName(g.accountId)):'Manual progress tracker'} · ${esc(g.category||'General')}</p></div><span class="mini-status ${p>=100?'':'neutral'}">${p>=100?'Reached':'In progress'}</span></div><div class="card-amount">${money(amount)}</div>${g.reservedForSpending?`<p class="reserve-label">🔒 ${money(g.reservedAmount||0)} earmarked from usable money</p>`:''}<div class="card-pair"><span>Target ${money(g.target)}</span><strong>${Math.round(p)}%</strong></div><div class="progress green"><span style="width:${p}%"></span></div><div class="card-footer"><span>${g.deadline?'Goal date: '+prettyDay(g.deadline):'No deadline'}</span><div class="actions"><button class="btn btn-icon" data-action="edit-goal" data-id="${g.id}" aria-label="Edit">${icon('edit','small-ico')}</button><button class="btn btn-icon" data-action="delete-goal" data-id="${g.id}" aria-label="Delete">${icon('trash','small-ico')}</button></div></div></div>`}).join('')}</div>`:empty('🎯','What are you saving for?','Create a goal and link it to a bank account, or track progress manually.','Create a goal','new-goal')}<p class="section-note" style="margin-top:19px">A linked goal displays the current balance of its selected account. A manually tracked goal is only a progress note and does not create money or affect net wealth. Avoid linking multiple goals to the same account if you want their combined total to represent distinct savings.</p>`;}
-  function renderSettings(){const cloudReady=!!(config.url&&config.key),connected=!!auth?.access_token;return `${heading('YOUR PREFERENCES','Settings & Cloud Sync','Make this tracker yours, back up your records and connect your devices.')}${banner()}<div class="settings-grid"><section class="setting-block setting-wide"><h3>${icon('cloud')} Multi-device sync</h3><p>Use the same Supabase-hosted account on your phone and computer. Updates sync between both while online; changes made offline will retry once connected.</p>${connected?`<div class="sync-account"><div><strong>${esc(auth.user?.email||'Signed in')}</strong><span>Cloud account connected · ${esc(syncStatus)} · ${ops.length} queued change(s)</span></div><span class="mini-status">Connected</span></div><div class="settings-actions">${button(icon('refresh')+' Sync now','sync-now','btn-ghost')}${button(icon('log-out')+' Sign out','sign-out','btn-light')}</div>`:cloudReady?`<div class="settings-actions">${button(icon('cloud')+' Sign in or register','open-auth','btn-primary')}${button('Change cloud connection','edit-cloud','btn-light')}</div>`:`<div class="banner gold">${icon('info')}<span>A Supabase project is needed for private cloud storage. The setup guide is included with the app files.</span></div>${button(icon('cloud')+' Connect cloud','edit-cloud','btn-primary')}`}<div class="note-box" style="margin-top:15px">Never enter a Supabase <strong>service_role</strong> or secret API key here. Only use the public <strong>publishable / anon</strong> key. The SQL setup enables per-user database security.</div></section><section class="setting-block"><h3>Monthly spending budget</h3><p>Get a clear indication of how much of your chosen monthly limit you have used.</p><form id="budget-form"><div class="form-row"><label class="form-label" for="budget-value">Budget (MYR)</label><input id="budget-value" name="monthlyBudget" class="form-input" type="number" min="1" step="0.01" required value="${Number(data.settings.monthlyBudget)||0}"></div><button class="btn btn-primary" type="submit">Save budget</button></form></section><section class="setting-block"><h3>Install on your phone</h3><p>Android: open the hosted website in Chrome and choose “Install app” from the menu. iPhone: Safari → Share → Add to Home Screen.</p><div class="info-strip">${icon('check')} No app store required · Works offline</div></section><section class="setting-block"><h3>Backup & export</h3><p>Download all records as a JSON backup, or export your transaction list as CSV for Excel.</p><div class="settings-actions">${button(icon('download')+' Download backup','export-json','btn-light')}${button('Export CSV','export-csv','btn-light')}${button(icon('upload')+' Restore backup','import-json','btn-ghost')}</div><input type="file" id="import-file" accept=".json,application/json" hidden /></section><section class="setting-block setting-wide"><h3>Custom categories &amp; account types</h3><p>Create your own categories for daily spending, income, savings goals and investments, plus custom account types. Changes sync through your existing cloud Settings record. Removing a label does not delete any historical records.</p><form id="category-form" class="custom-category-form"><div class="form-row"><label class="form-label" for="custom-category-group">Add to</label><select class="form-input" id="custom-category-group" name="group">${CUSTOM_GROUPS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div><div class="form-row"><label class="form-label" for="custom-category-name">New category name</label><input id="custom-category-name" class="form-input" name="name" maxlength="42" required placeholder="e.g. Parking, Holiday fund"></div><button class="btn btn-primary" type="submit">${icon('plus')} Add category</button></form><div class="custom-category-groups">${CUSTOM_GROUPS.map(([group,label])=>`<div><strong>${label}</strong><div class="category-tags">${customCats(group).length?customCats(group).map(name=>`<span class="category-tag">${esc(name)} <button type="button" data-action="remove-category" data-group="${group}" data-id="${esc(name)}" aria-label="Remove ${esc(name)}" title="Remove category">×</button></span>`).join(''):'<span class="hint">No custom entries yet</span>'}</div></div>`).join('')}</div></section><section class="setting-block"><h3>Time, currency & privacy</h3><p>All values are assumed to be Malaysian ringgit (MYR). Event dates appear in Malaysia time (UTC+8). The live clock uses your device clock; cloud updates also have a server timestamp.</p><div class="info-strip"><span class="tag">MYR · RM</span><span class="tag">Asia/Kuala_Lumpur</span><span class="tag">No advertisements</span></div></section><section class="setting-block setting-wide"><h3>Data controls</h3><p>Delete all local records or remove individual entries elsewhere in the app. Clearing data while cloud-connected also deletes your saved cloud records.</p><div class="settings-actions">${button(icon('trash')+' Delete all financial records','clear-data','btn-danger')}</div></section></div>`;}
+  function renderSettings(){const cloudReady=!!(config.url&&config.key),connected=!!auth?.access_token;return `${heading('YOUR PREFERENCES','Settings & Cloud Sync','Make this tracker yours, back up your records and connect your devices.')}${banner()}<div class="settings-grid"><section class="setting-block setting-wide"><h3>${icon('cloud')} Multi-device sync</h3><p>Use the same Supabase-hosted account on your phone and computer. Updates sync between both while online; changes made offline will retry once connected.</p>${connected?`<div class="sync-account"><div><strong>${esc(auth.user?.email||'Signed in')}</strong><span>Cloud account connected · ${esc(syncStatus)} · ${ops.length} queued change(s)</span></div><span class="mini-status">Connected</span></div><div class="settings-actions">${button(icon('refresh')+' Sync now','sync-now','btn-ghost')}${button(icon('log-out')+' Sign out','sign-out','btn-light')}</div>`:cloudReady?`<div class="settings-actions">${button(icon('cloud')+' Sign in or register','open-auth','btn-primary')}${button('Change cloud connection','edit-cloud','btn-light')}</div>`:`<div class="banner gold">${icon('info')}<span>A Supabase project is needed for private cloud storage. The setup guide is included with the app files.</span></div>${button(icon('cloud')+' Connect cloud','edit-cloud','btn-primary')}`}<div class="note-box" style="margin-top:15px">Never enter a Supabase <strong>service_role</strong> or secret API key here. Only use the public <strong>publishable / anon</strong> key. The SQL setup enables per-user database security. Financial data may be saved in this browser to support offline use. Sign out on shared devices; for stronger protection use a trusted personal device. The Supabase project owner can access stored records.</div></section><section class="setting-block"><h3>Monthly spending budget</h3><p>Get a clear indication of how much of your chosen monthly limit you have used.</p><form id="budget-form"><div class="form-row"><label class="form-label" for="budget-value">Budget (MYR)</label><input id="budget-value" name="monthlyBudget" class="form-input" type="number" min="1" step="0.01" required value="${Number(data.settings.monthlyBudget)||0}"></div><button class="btn btn-primary" type="submit">Save budget</button></form></section><section class="setting-block"><h3>Install on your phone</h3><p>Android: open the hosted website in Chrome and choose “Install app” from the menu. iPhone: Safari → Share → Add to Home Screen.</p><div class="info-strip">${icon('check')} No app store required · Works offline</div></section><section class="setting-block"><h3>Backup & export</h3><p>Download all records as a JSON backup, or export your transaction list as CSV for Excel.</p><div class="settings-actions">${button(icon('download')+' Download backup','export-json','btn-light')}${button('Export CSV','export-csv','btn-light')}${button(icon('upload')+' Restore backup','import-json','btn-ghost')}</div><input type="file" id="import-file" accept=".json,application/json" hidden /></section><section class="setting-block setting-wide"><h3>Custom categories &amp; account types</h3><p>Create your own categories for daily spending, income, savings goals and investments, plus custom account types. Changes sync through your existing cloud Settings record. Removing a label does not delete any historical records.</p><form id="category-form" class="custom-category-form"><div class="form-row"><label class="form-label" for="custom-category-group">Add to</label><select class="form-input" id="custom-category-group" name="group">${CUSTOM_GROUPS.map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></div><div class="form-row"><label class="form-label" for="custom-category-name">New category name</label><input id="custom-category-name" class="form-input" name="name" maxlength="42" required placeholder="e.g. Parking, Holiday fund"></div><button class="btn btn-primary" type="submit">${icon('plus')} Add category</button></form><div class="custom-category-groups">${CUSTOM_GROUPS.map(([group,label])=>`<div><strong>${label}</strong><div class="category-tags">${customCats(group).length?customCats(group).map(name=>`<span class="category-tag">${esc(name)} <button type="button" data-action="remove-category" data-group="${group}" data-id="${esc(name)}" aria-label="Remove ${esc(name)}" title="Remove category">×</button></span>`).join(''):'<span class="hint">No custom entries yet</span>'}</div></div>`).join('')}</div></section><section class="setting-block"><h3>Time, currency & privacy</h3><p>All values are assumed to be Malaysian ringgit (MYR). Event dates appear in Malaysia time (UTC+8). The live clock uses your device clock; cloud updates also have a server timestamp.</p><div class="info-strip"><span class="tag">MYR · RM</span><span class="tag">Asia/Kuala_Lumpur</span><span class="tag">No advertisements</span></div></section><section class="setting-block setting-wide"><h3>Data controls</h3><p>Delete all local records or remove individual entries elsewhere in the app. Clearing data while cloud-connected also deletes your saved cloud records.</p><div class="settings-actions">${button(icon('trash')+' Delete all financial records','clear-data','btn-danger')}</div></section></div>`;}
   const accountOptions=(selected='',filter=null)=>data.accounts.filter(a=>!filter||filter(a)).map(a=>`<option value="${a.id}" ${a.id===selected?'selected':''}>${esc(a.name)} (${labelAccount(a.type)})</option>`).join('');
   const field=(label,name,type='text',value='',opts='')=>`<div class="form-row"><label class="form-label" for="field-${name}">${label}</label><input class="form-input" id="field-${name}" name="${name}" type="${type}" value="${esc(value)}" ${opts}></div>`;
   const select=(label,name,options,selected,extra='')=>`<div class="form-row"><label class="form-label" for="field-${name}">${label}</label><select class="form-input" id="field-${name}" name="${name}" ${extra}>${options.map(([v,l])=>`<option value="${esc(v)}" ${String(v)===String(selected)?'selected':''}>${esc(l)}</option>`).join('')}</select></div>`;
@@ -362,12 +380,21 @@
     if(!payload?.access_token||!payload?.user?.id)throw Error('Sign in response was incomplete.');
     const next={access_token:payload.access_token,refresh_token:payload.refresh_token,expires_at:Math.floor(Date.now()/1000)+Number(payload.expires_in||3600),user:{id:payload.user.id,email:payload.user.email}};
     if(auth?.user?.id!==next.user.id)changeIdentity(next);else auth=next;
-    localStorage.setItem(AUTH_KEY,JSON.stringify(auth));
+    writeAuthStorage();
   }
-  async function refreshAuth(){if(!auth?.refresh_token)throw Error('Your session has expired. Sign in again.');const payload=await cloudFetch('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:auth.refresh_token})},false);saveAuth(payload);return auth;}
+  async function refreshAuth(){
+    if(!auth?.refresh_token)throw Error('Your session has expired. Sign in again.');
+    const epoch=accountEpoch, id=auth.user.id, token=auth.refresh_token;
+    const payload=await cloudFetch('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:token})},false);
+    if(epoch!==accountEpoch||auth?.user?.id!==id||auth?.refresh_token!==token)throw Error('Session changed while refreshing.');
+    if(payload.user?.id!==id)throw Error('Session identity changed. Sign in again.');
+    saveAuth(payload);return auth;
+  }
   async function signIn(values){
     if(!cloudReady())throw Error('The site owner has not configured cloud sign-in yet.');
     const signup=values.mode==='signup';
+    if(signup&&String(values.password||'').length<8)throw Error('Choose a password with at least 8 characters.');
+    rememberSession=values.remember==='on';
     const path=signup?'/auth/v1/signup?redirect_to='+encodeURIComponent(location.origin+location.pathname):'/auth/v1/token?grant_type=password';
     const reply=await cloudFetch(path,{method:'POST',body:JSON.stringify({email:values.email,password:values.password})});
     if(signup&&!reply.access_token){authMessage='Check your email to confirm your account, then return here and sign in. Check spam if needed.';render();return;}
@@ -418,9 +445,13 @@
   }
   let flushing=false;
   async function flushQueue(){if(flushing||!auth?.access_token||!cloudReady())return;flushing=true;let failed=false;
-    try{while(ops.length){const op=ops[0];if(op.user_id!==auth.user.id){ops.shift();storeQueue();continue;}
-      if(op.action==='delete'){await cloudFetch('/rest/v1/finance_records?id=eq.'+encodeURIComponent(op.id),{method:'DELETE'});}else{await cloudFetch('/rest/v1/finance_records?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{id:op.record.id,user_id:auth.user.id,kind:op.kind,payload:op.record}])});}
-      ops.shift();storeQueue();}
+    const epoch=accountEpoch, owner=auth.user.id;
+    try{while(ops.length&&epoch===accountEpoch&&auth?.user?.id===owner){
+      const op=ops[0];if(op.user_id!==owner){ops.shift();storeQueue();continue;}
+      if(op.action==='delete'){await cloudFetch('/rest/v1/finance_records?id=eq.'+encodeURIComponent(op.id),{method:'DELETE'});}else{await cloudFetch('/rest/v1/finance_records?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{id:op.record.id,user_id:owner,kind:op.kind,payload:op.record}])});}
+      if(epoch!==accountEpoch||auth?.user?.id!==owner)break;
+      if(ops[0]===op){ops.shift();storeQueue();}}
+
       syncStatus='synced';
     }catch(err){failed=true;syncStatus='error';}
     finally{flushing=false;const node=document.querySelector('.sync-chip');if(node)node.innerHTML=`<span class="sync-dot ${syncStatus==='synced'?'connected':''}"></span>${syncStatus==='synced'?'Cloud synced':'Sync pending'}`;}
@@ -437,14 +468,53 @@
     // Polling fallback, for projects without Realtime publication or websocket access.
     pollHandle=setInterval(()=>{if(!auth?.access_token)return;if(navigator.onLine===false)return;if(ops.length)flushQueue();else if(!modalKind)pullCloud(false);},12000);
   }
-  async function resumeCloud(){if(!auth?.access_token||!cloudReady()){booting=false;render();return;}try{if(auth.expires_at<Date.now()/1000+100)await refreshAuth();await pullCloud(true);startRealtime();}catch(err){syncStatus='error';booting=false;authMessage='Your session could not be verified. Try signing in again.';changeIdentity(null);localStorage.removeItem(AUTH_KEY);render();}}
-  function signOut(){
-    if(ops.length)return toast('There are unsynced entries. Reconnect and sync before signing out.');
-    if(!confirm('Sign out of WealthFlow on this device? Your cloud records will remain saved.'))return;
-    const oldId=userId();changeIdentity(null);clearCurrentCache(oldId);
-    localStorage.removeItem(AUTH_KEY);localStorage.removeItem('wealthflow_last_cloud_user');
-    data=blank();ops=[];booting=false;authMessage='You signed out. Your cloud records remain in your private account.';syncStatus='local';view='overview';closeModal();render();
+  async function resumeCloud(){
+    if(!auth?.access_token||!cloudReady()){booting=false;render();return;}
+    const epoch=accountEpoch, expectedId=auth.user.id;
+    try{
+      if(auth.expires_at<Date.now()/1000+100)await refreshAuth();
+      const verified=await cloudFetch('/auth/v1/user');
+      if(epoch!==accountEpoch||auth?.user?.id!==expectedId)return;
+      if(verified.id!==expectedId)throw Error('Session identity mismatch.');
+      await pullCloud(true);
+      if(auth?.user?.id===expectedId&&epoch===accountEpoch)startRealtime();
+    }catch(err){
+      if(epoch!==accountEpoch||auth?.user?.id!==expectedId)return;
+      syncStatus='error';booting=false;
+      authMessage='Could not verify your session. Please sign in again when online.';
+      changeIdentity(null);clearAuthStorage();render();
+    }
   }
+  function endLocalSession(message,signal=true){
+    const oldId=userId();
+    changeIdentity(null);
+    clearCurrentCache(oldId);
+    clearAuthStorage();localStorage.removeItem('wealthflow_last_cloud_user');
+    booting=false;authMessage=message;syncStatus='local';view='overview';closeModal();render();
+    if(signal&&oldId)localStorage.setItem(LOGOUT_EVENT,JSON.stringify({userId:oldId,nonce:uid()}));
+  }
+  async function signOut(){
+    if(ops.length)return toast('There are unsynced entries. Reconnect and sync before signing out.');
+    if(!confirm('Sign out on this device? Your cloud records remain saved.'))return;
+    const session=auth;
+    // Wipe the visible dashboard and browser session even if network logout fails.
+    endLocalSession('Signed out. Your cloud records remain in your account.');
+    if(!session?.access_token)return;
+    try{
+      const res=await fetch(cloudUrl()+'/auth/v1/logout?scope=local',{
+        method:'POST',headers:{apikey:config.key,Authorization:'Bearer '+session.access_token}
+      });
+      if(!res.ok)throw Error('Supabase sign-out was not confirmed ('+res.status+').');
+      toast('Signed out of this device and Supabase session.');
+    }catch{
+      toast('Signed out on this device. Server logout could not be confirmed; reconnect and review your sessions if needed.');
+    }
+  }
+  // Other tabs on the same browser origin must not retain a signed-out user's dashboard.
+  window.addEventListener('storage',event=>{
+    if(event.key!==LOGOUT_EVENT||!event.newValue||!userId())return;
+    try{const msg=JSON.parse(event.newValue);if(msg.userId===userId())endLocalSession('Signed out in another browser tab.',false);}catch{}
+  });
   function setConfig(values){if(sharedConfigured)throw Error('This shared website is already configured by its owner.');let url=values.url.trim().replace(/\/+$/,'');if(!/^https:\/\/.+/.test(url))throw Error('Use a full HTTPS Supabase project URL.');if(/service_role|sb_secret_/i.test(values.key))throw Error('Never use a secret or service_role key in a website.');if(!values.key.trim())throw Error('Enter your public Supabase key.');if(auth?.access_token)throw Error('Sign out before switching your Supabase project.');config={url,key:values.key.trim()};localStorage.setItem(CONFIG_KEY,JSON.stringify(config));closeModal();openModal('auth');toast('Cloud project saved on this device.');}
   async function handleAction(action,id,target){
     if(!auth?.access_token&&!['auth-tab','forgot-password','open-auth','close-modal','edit-cloud','dismiss-backdrop'].includes(action))return;
@@ -487,14 +557,14 @@
     if(action==='mature-investment'){const i=byId('investments',id);if(i&&confirm('Mark this placement closed? This does NOT move your money or add interest. Record an actual transfer and any return when received.')){mutate([{kind:'investments',record:{...i,status:'matured'}}]);toast('Investment marked closed.');}return;}
     if(action==='switch-tx'){const current=document.getElementById('entry-form');const values=current?Object.fromEntries(new FormData(current)):{};if(target.dataset.type!==formTxType)delete values.category;formTxType=target.dataset.type;modalMarkup(values);return;}
     if(action==='forgot-password'){await recoverPassword();return;}
-    if(action==='auth-tab'){authMessage='';const signup=target.dataset.mode==='signup';document.querySelectorAll('[data-action="auth-tab"]').forEach(x=>x.classList.toggle('active',x===target));const f=document.getElementById('auth-form');f.elements.mode.value=signup?'signup':'login';document.getElementById('auth-submit').textContent=signup?'Create account':'Sign in';const password=document.getElementById('auth-password');if(password)password.autocomplete=signup?'new-password':'current-password';return;}
+    if(action==='auth-tab'){authMessage='';const signup=target.dataset.mode==='signup';document.querySelectorAll('[data-action="auth-tab"]').forEach(x=>x.classList.toggle('active',x===target));const f=document.getElementById('auth-form');f.elements.mode.value=signup?'signup':'login';document.getElementById('auth-submit').textContent=signup?'Create account':'Sign in';const password=document.getElementById('auth-password');if(password){password.autocomplete=signup?'new-password':'current-password';password.minLength=signup?8:6;}return;}
     if(action==='go-transactions'){navTo('transactions');return;}
     if(action==='export-json'){exportJSON();return;}
     if(action==='export-csv'){exportCSV();return;}
     if(action==='import-json'){document.getElementById('import-file')?.click();return;}
     if(action==='edit-cloud'){openModal('cloud');return;}
     if(action==='open-auth'){openModal('auth');return;}
-    if(action==='sign-out'){signOut();return;}
+    if(action==='sign-out'){await signOut();return;}
     if(action==='sync-info'){navTo('settings');return;}
     if(action==='sync-now'){syncStatus='pending';render();await flushQueue();await pullCloud();toast(syncStatus==='synced'?'Cloud records are up to date.':'Unable to sync. Entries are still stored here.');return;}
     if(action==='clear-data'){

@@ -1,0 +1,59 @@
+WEALTHFLOW V5.1 — SECURITY UPDATE, KEEP YOUR EXISTING DATA
+=========================================================
+
+FIRST: your live V5 website is working. Do NOT delete your existing project,
+Netlify site, GitHub repository, or Supabase database.
+
+1. Open live WealthFlow V5 → Settings → Sync now. Confirm "Cloud synced" and
+   "0 queued change(s)". Download a JSON backup. Keep it OFF GitHub/Netlify.
+2. Keep your existing GitHub repository PRIVATE.
+3. Find the version of the wealthflow-app folder that currently works and is
+   configured to use your Supabase project. Make a COPY of this folder.
+4. Extract the "WealthFlow-V5-1-Security-Patch.zip" ZIP.
+5. Open its wealthflow-app folder. Copy these items into your copied working
+   wealthflow-app folder, choosing Replace when Windows asks:
+      app.js
+      index.html
+      styles.css
+      service-worker.js
+      _headers
+      PRIVACY.md
+      SECURITY-RELEASE-CHECKLIST.md
+      V5.1-UPDATE-STEPS.txt
+6. VERY IMPORTANT: Leave your existing cloud-config.js as it is. Do NOT replace
+   it with the placeholders in the complete V5.1 download. Keep only your
+   Supabase Project URL + PUBLIC publishable key, never admin/secret keys.
+7. To publish now using your EXISTING Netlify site (not a new project):
+   Netlify → your WealthFlow site → Deploys → drag your newly updated complete
+   wealthflow-app FOLDER into the manual deploy area.
+8. To update GitHub: copy the same updated files into the existing private
+   repository's wealthflow-app directory and commit. Do not upload backups.
+   GitHub Desktop may be easier for multiple file replacements.
+9. Refresh WealthFlow (Ctrl + Shift + R). You should see V5.1 on the sign-in
+   screen. Sign in with your existing credentials and verify your accounts.
+10. Test with an Incognito friend account to ensure it remains empty and
+    separate; test sign-out and re-login; verify phone sync. Then inspect the
+    SECURITY-RELEASE-CHECKLIST.md file before publishing GitHub publicly.
+
+CHANGES
+- Sign-out sends POST /auth/v1/logout?scope=local to Supabase, so it normally
+  revokes the current session on the server while keeping other devices signed in.
+- Browser dashboard and user cache clear immediately on sign-out, even if offline.
+- The app warns if server logout fails. Already-issued JWTs remain valid until
+  expiry; this is a limitation of Supabase authentication.
+- Login is session-only by default; “Stay signed in” is an explicit opt-in for
+  persistent credentials on a trusted personal device.
+- Existing V5 browser login tokens are migrated to session storage by default.
+- Logout in one tab clears the signed-in account on other tabs of that origin.
+- A session is verified with Supabase on page load; checks guard account-switch
+  races while refreshing credentials or syncing pending changes.
+- Netlify _headers adds CSP and common security headers.
+- A privacy notice explains browser storage and admin access to cloud records.
+
+IMPORTANT LIMITATIONS
+- Financial data are not end-to-end encrypted, and offline data may remain in
+  unencrypted browser storage. Avoid public/shared devices.
+- No live production Supabase security audit was performed for V5.1. The
+  code-level tests used simulated responses; test the actual deployed app.
+- The project owner's privileged Supabase access can see other users' data.
+- Keep the code private until a security reviewer has checked the deployment.

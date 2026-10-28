@@ -1,4 +1,4 @@
-const CACHE = 'wealthflow-static-v5-personal-accounts';
+const CACHE = 'wealthflow-static-v5-1-security';
 const ASSETS = ['./', './index.html', './styles.css', './app.js', './cloud-config.js', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
