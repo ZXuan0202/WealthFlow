@@ -1,0 +1,24 @@
+WEALTHFLOW V5 — QUICK UPDATE FROM V4
+====================================
+1. On your current online WealthFlow, click Settings > Sync now.
+   Wait for Cloud synced and 0 queued changes, then Download backup.
+2. Download & extract WealthFlow-V5-Personal-Accounts.zip on Windows.
+3. Open the extracted wealthflow-app folder. Right-click cloud-config.js
+   and choose Open with > Notepad.
+4. Replace the project URL and publishable key placeholders with the SAME
+   Supabase values you already use on your V4 computer.
+   Find them in Supabase > Settings > Data API / API Keys.
+   DO NOT enter your secret key or database password.
+5. Ctrl+S to save cloud-config.js.
+6. Open Supabase > Authentication > URL Configuration. Use your current
+   Netlify website as the Site URL and authorized Redirect URL.
+   Ensure new email/password registrations are allowed and confirmations work.
+7. Netlify > EXISTING WealthFlow project > Deploys > manually deploy the
+   entire updated wealthflow-app folder, not the ZIP or a single file.
+8. Refresh your existing website. Sign in using your ORIGINAL WealthFlow
+   email/password. Check your bank balances and cloud sync before proceeding.
+9. Open your site in a private/incognito window. Create a DIFFERENT test
+   account with a different email. It should be completely blank.
+10. Give your normal website link to your friends; they create personal accounts.
+
+Full explanations: SHARE-SETUP.txt and README.md.

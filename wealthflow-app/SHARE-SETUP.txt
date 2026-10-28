@@ -1,0 +1,91 @@
+WEALTHFLOW V5 — SHARE ONE WEBSITE WITH SEPARATE PRIVATE ACCOUNTS
+===============================================================
+
+BEFORE YOU START — BACKUP FIRST
+1. On your EXISTING WealthFlow V4 website, go to Settings > Sync now.
+2. Confirm "Cloud synced" and "0 queued changes".
+3. In Settings, download a JSON backup and store it privately, NOT in Netlify files.
+4. Make sure you know your own WealthFlow email and password.
+
+YOUR FRIENDS WILL NOT USE YOUR PASSWORD. Each person creates an account with their own email.
+
+A. SET UP THE SHARED CONNECTION (ONE TIME)
+
+1. Download and extract WealthFlow-V5-Personal-Accounts.zip on Windows.
+2. Open the extracted "wealthflow-app" folder.
+3. Right-click "cloud-config.js" > Open with > Notepad.
+4. Go to your existing Supabase "WealthFlow Personal" project.
+   - Project URL: from the project overview or Settings > Data API.
+   - Public key: Settings > API Keys > Publishable key > default > Copy.
+5. Replace only the two texts INSIDE THE SINGLE QUOTES:
+   PASTE_YOUR_SUPABASE_PROJECT_URL_HERE
+   PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE
+
+Example, for format only (NOT YOUR REAL CREDENTIALS):
+    window.WEALTHFLOW_CLOUD = {
+      url: 'https://EXAMPLE.supabase.co',
+      key: 'sb_publishable_EXAMPLE'
+    };
+
+   Do not remove quote marks, commas or braces. Save the file (Ctrl+S).
+   NEVER put a "sb_secret_" or "service_role" key in this file.
+   Your publishable key is intentionally public. The Supabase security policies
+   (RLS) are what separate each person's bank records.
+
+B. CONFIGURE SUPABASE AUTH FOR YOUR WEBSITE (ONE TIME)
+
+1. Open Supabase > Authentication > URL Configuration.
+2. Site URL: https://courageous-kleicha-45a81e.netlify.app
+   If you changed your Netlify domain, use YOUR OWN new domain instead.
+3. Add your same HTTPS website to the Redirect URL allow list if needed.
+4. Under Authentication > Providers > Email, keep Email sign-ins enabled.
+5. Under Authentication > Settings or Providers > Email, check that new user
+   signups are allowed. Keep email confirmation ON for safer registration.
+6. IMPORTANT: your Supabase database must already have the secure policies in
+   database.sql. For the existing Supabase setup from V4, no new table is needed.
+   If you're uncertain, a read-only policy check is in SECURITY-CHECK.sql.
+
+C. DEPLOY V5 WITHOUT CHANGING YOUR WEBSITE ADDRESS
+
+1. Go to Netlify > existing WealthFlow project > Deploys.
+2. Drag the entire updated "wealthflow-app" FOLDER into the manual deploy area.
+3. Do NOT start a new Netlify project and do NOT upload financial JSON backups.
+4. Open your normal WealthFlow website and reload (Ctrl+Shift+R on Windows).
+   You should see a Welcome / Sign in / Create account page.
+5. Sign in using your ORIGINAL WealthFlow account, NOT a new account.
+6. Check My Accounts and your balance. Verify Settings > Cloud synced, 0 queued.
+7. If your original records don't appear, STOP. Do not import or create
+   replacement accounts until you've checked your old backup/Supabase data.
+
+D. TEST WITH A FRIEND (IMPORTANT)
+
+1. Open your website in an Incognito/Private browser window or a second browser.
+2. Click "Create account"; use a different personal email and password.
+3. Confirm the email message (if Supabase requires it), then sign in.
+4. The new account's My Accounts/Transactions/Bills must all start EMPTY.
+5. Create a TEST cash account for that friend. Your original account must NOT
+   see it, and the friend must NOT see yours.
+6. Sign out on a shared device when finished.
+
+E. SHARE
+
+Send your existing Netlify website link to friends. They only need:
+- your site URL
+- their own email address and password
+They do NOT need the Supabase project URL, API keys, SQL editor, or Netlify.
+
+SECURITY & IMPORTANT LIMITS
+
+- The website files are public; the data is private only when Supabase RLS and
+  authenticated grants are correctly enabled. No bank passwords are stored.
+- On shared computers, anyone using an unlocked, already signed-in browser can
+  see the signed-in user's data. Always sign out and lock your device.
+- Financial data in browser local storage is not end-to-end encrypted.
+- Existing owner data is not erased from Supabase by publishing new site files.
+- Browser cache may display the old V4 UI until refreshed/updated.
+- The free Supabase/Netlify limits and rate limits still apply.
+- New signups may be rate limited by Supabase's default email delivery settings.
+- If a friend confirms an email but sees a blank page, return to website and
+  choose Sign in. If the email link redirects elsewhere, check Site URL.
+- Cloud configuration baked into the website is public; NEVER use admin/secret keys.
+- Before any important change, download a JSON backup for your own account.
