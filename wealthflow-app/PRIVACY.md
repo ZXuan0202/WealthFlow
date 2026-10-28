@@ -1,4 +1,6 @@
-# WealthFlow Privacy Notice (V5.1)
+# WealthFlow Privacy Notice (V5.2 Beta)
+
+The user-facing beta notice is **privacy.html**, linked before signup and in Settings. Keep that page and this operator document consistent. A private contact and provider-backup/log retention policy are still required before a wider public launch; no details have been invented for the operator.
 
 WealthFlow is a personal finance tracker operated by the person who owns the website and its Supabase project. This notice is a template for that operator to review before inviting users. It is NOT a legal review.
 

@@ -1,4 +1,8 @@
-# WealthFlow V5 — Personal Accounts Edition
+# WealthFlow V5.2 Beta
+
+V5.2 protects edits made during a cloud refresh, serializes sync requests for each signed-in identity, and loads every counted page before replacing the saved record set. A failed or incomplete read preserves the browser copy; failed writes retain their queue. The sign-in page and Settings now link to `privacy.html`.
+
+See **RELEASE-V5.2.md** for deployment and live validation. This is a beta, and these changes do not establish that the live database is correctly secured. No database migration is required; preserve the existing `cloud-config.js`.
 
 This is a responsive, installable personal finance web app. It includes all earlier features (accounts, transactions, wealth charts, investments, SPayLater, savings goals, custom categories, subscription and bill reminders) plus **a shared sign-in page** so multiple people can use **one website link with independent private accounts**.
 
@@ -58,4 +62,6 @@ If older browser-local data is present, V5 never automatically merges it into a 
 
 ## Testing
 
-V5 was tested in a local Chromium browser with **mocked Supabase requests**, including a legacy owner data store, new friend signup/sign-in, a blank friend account, creating a friend-owned account, logout cache cleanup, owner login, and mobile/desktop sign-in layouts. JavaScript syntax checks passed. **Live Supabase account creation and actual Netlify deployment were not tested** because your live public key and project admin access were not available in this environment.
+Run `node --test tests/*.test.cjs` from the repository root with Node.js 24. The dependency-free suite executes the app's actual sync functions in a mocked browser environment and mocks the HTTP responses. It covers more than 1,000 records, smaller server page limits, slow reads during edits, concurrent requests, failed writes and retries, incomplete pages, account switches, logout during a request, and backup identity checks. Syntax checks and this regression suite are also configured in GitHub Actions.
+
+No live Supabase signup, database isolation test, Netlify deployment, or browser visual validation was completed for V5.2. A local browser smoke test was attempted, but this environment has no installed Chromium executable. Complete the live and mobile/desktop checks in RELEASE-V5.2.md before a wider launch.

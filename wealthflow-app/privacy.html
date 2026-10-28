@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#121a31">
+  <meta name="description" content="How WealthFlow Beta stores financial records, supports deletion and handles device storage.">
+  <title>Privacy &amp; data use — WealthFlow</title>
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="privacy-page">
+  <main class="privacy-card">
+    <a class="privacy-back" href="./">← Back to WealthFlow</a>
+    <p class="eyebrow">WEALTHFLOW BETA · UPDATED 28 OCTOBER 2026</p>
+    <h1>Privacy &amp; data use</h1>
+    <p class="privacy-lead">Understand where your records live and who can access them before you create an account.</p>
+    <div class="note-box"><strong>Beta testing:</strong> WealthFlow is an independent project operated by GitHub user ZXuan0202. It has not received an independent security audit. Use example data while the live security checks and the operator’s private support and retention arrangements are being completed.</div>
+    <section>
+      <h2>What is stored</h2>
+      <p>Supabase manages your email and sign-in information. The operator’s Supabase database stores the account names, balances, transactions, investments, pay-later plans, savings goals, bills and preferences you enter. WealthFlow does not connect to your bank or make payments.</p>
+      <p>Do not enter bank passwords, card security codes or banking credentials.</p>
+    </section>
+    <section>
+      <h2>Who can access your records</h2>
+      <p>Account access rules are designed to let each signed-in user read and change their own records. The database owner and authorized administrators can technically access stored records. Supabase and Netlify provide the database, authentication and hosting services.</p>
+      <p>Connections use HTTPS. Records are <strong>not end-to-end encrypted</strong>; account separation does not prevent privileged administrator access.</p>
+    </section>
+    <section>
+      <h2>Storage on your device</h2>
+      <p>Financial records and pending edits are cached in browser storage for offline entry. This cache is not encrypted by WealthFlow. Tokens stay in the current tab by default; “Stay signed in” saves them persistently on that device.</p>
+      <p>Use a trusted device. Wait for pending changes to sync, then sign out to clear that account’s cache. Closing a tab alone does not clear the financial cache. Downloaded JSON backups and CSV exports are also unencrypted.</p>
+    </section>
+    <section>
+      <h2>Deleting records and closing an account</h2>
+      <p>Settings → Delete all financial records removes the ledger records and bill schedules currently loaded in your account and queues their deletion from the cloud. Stay online until sync completes. This action does not close your sign-in account or remove every preference.</p>
+      <p>The operator has not yet published a private contact for account closure or privacy requests, or a retention schedule for service backups and logs. Those details must be completed before a wider public launch. No immediate deletion from provider backups is promised.</p>
+    </section>
+    <section>
+      <h2>Feedback during the beta</h2>
+      <p>You can report general bugs through <a href="https://github.com/ZXuan0202/WealthFlow/issues" rel="noreferrer">GitHub Issues</a>. Issues are public: never post your financial records, backups, passwords, access tokens or other private account information there.</p>
+      <p>WealthFlow is a manual tracking tool, not a banking service or financial adviser.</p>
+    </section>
+    <a class="btn btn-primary" href="./">Return to WealthFlow</a>
+  </main>
+</body>
+</html>

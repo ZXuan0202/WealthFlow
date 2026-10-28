@@ -1,5 +1,7 @@
 # WealthFlow V5.1 — Security release checklist
 
+**V5.2 Beta:** Also complete RELEASE-V5.2.md. The added regression tests use mocks; direct API isolation, live response headers, signup/reset delivery and mobile/desktop verification remain outstanding.
+
 **Do not declare the app security-audited or ready for handling strangers' real financial records solely on the basis of local tests.** The owner must validate the live deployment and be transparent about privileged database access.
 
 ## Pre-deployment
