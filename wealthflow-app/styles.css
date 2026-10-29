@@ -126,3 +126,13 @@ svg{display:block}.ico{width:19px;height:19px;fill:none;stroke:currentColor;stro
 
 /* V5.1: explicit opt-in for persistent login */
 .auth-remember{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:7px 0 14px;font-size:13px;color:#475569;cursor:pointer}.auth-remember input{width:17px;height:17px;accent-color:#7761ee}.auth-remember small{font-size:11px;color:#8893a9}
+.privacy-page{margin:0;padding:32px 20px;background:#f6f7fb;color:#273047;}
+.privacy-card{max-width:780px;margin:0 auto;padding:40px;background:#fff;border:1px solid #e5e8ef;border-radius:24px;box-shadow:0 16px 50px #18213a08;}
+.privacy-back{display:inline-block;margin-bottom:30px;color:#6551c7;}
+.privacy-card h1{margin:12px 0;font-size:clamp(30px,6vw,42px);line-height:1.15;}
+.privacy-lead{font-size:18px;color:#626d82;line-height:1.65;}
+.privacy-card section{margin:28px 0;}
+.privacy-card h2{font-size:20px;margin-bottom:10px;}
+.privacy-card p{line-height:1.75;}
+.privacy-card a:focus-visible{outline:3px solid #7a68ec;outline-offset:4px;}
+@media(max-width:600px){.privacy-page{padding:16px 12px;}.privacy-card{padding:24px 20px;border-radius:18px;}}

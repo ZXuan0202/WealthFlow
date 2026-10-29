@@ -2,6 +2,8 @@
 
 **Personal Wealth, Expense & Savings Tracker**
 
+**V5.2 Beta** — testing with example data is recommended while live security verification, a private support contact and backup-retention arrangements are completed. See [release and validation steps](wealthflow-app/RELEASE-V5.2.md).
+
 WealthFlow is a mobile-friendly personal finance web application designed to help people understand their money, manage daily expenses, track savings, and monitor their financial progress.
 
 🌐 **[Try WealthFlow](https://courageous-kleicha-45a81e.netlify.app)**
@@ -44,6 +46,18 @@ This is an independently developed personal finance project, not a banking servi
 
 ## 🚀 Project Status
 
-WealthFlow is an evolving project. Features, security and user experience will continue to be improved.
+WealthFlow is in beta. V5.2 protects local edits during cloud refreshes, loads records across multiple pages, and keeps saved data intact when a cloud read is incomplete. [Privacy & data use](wealthflow-app/privacy.html) explains administrator access, device storage and outstanding launch requirements.
 
 Feedback and bug reports are welcome through GitHub Issues.
+
+## Development checks
+
+Requires Node.js 24. No package installation is needed:
+
+```sh
+node --check wealthflow-app/app.js
+node --check wealthflow-app/service-worker.js
+node --test tests/*.test.cjs
+```
+
+GitHub Actions runs the syntax and regression checks on pull requests and pushes to `main`. Tests mock network requests and do not access live financial records or establish that the deployed database is secure.
